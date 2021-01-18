@@ -2595,27 +2595,28 @@ return nil."
                                  (setq def (general--extract-autoloadable-symbol
                                             def))))
                      collect def)))
-      (list :arglists general-arglists :commands commands)))
+      (list (list :arglists general-arglists :commands commands))))
 
   (defun use-package-autoloads/:general (_name _keyword args)
     "Return an alist of commands extracted from ARGS.
 Return something like '((some-command-to-autoload . command) ...)."
-    (mapcar (lambda (command) (cons command 'command))
-            (plist-get args :commands)))
+    (cl-loop for props in args
+             append (cl-loop for cmd in (plist-get props :commands)
+                             collect (cons cmd 'command))))
 
   (defun use-package-handler/:general (name _keyword args rest state)
     "Use-package handler for :general."
     (use-package-concat
      (use-package-process-keywords name rest state)
-     `(,@(mapcar (lambda (arglist)
-                   ;; Note: prefix commands are not valid functions
-                   (if (or (functionp (car arglist))
-                           (macrop (car arglist)))
-                       `(,@arglist :package ',name)
-                     `(general-def
-                        ,@arglist
-                        :package ',name)))
-                 (plist-get args :arglists)))))
+     (cl-loop for props in args
+              append (cl-loop for arglist in (plist-get props :arglists)
+                              if (or (functionp (car props))
+                                     (macrop (car arglist)))
+                              collect `(,@arglist :package ',name)
+                              else
+                              collect `(general-def
+                                         ,@arglist
+                                         :package ',name)))))
 
   ;; ** :ghook and :gfhook Keyword
   (setq use-package-keywords
